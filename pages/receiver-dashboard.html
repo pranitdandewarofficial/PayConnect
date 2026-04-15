@@ -1,0 +1,604 @@
+
+# Create Receiver Dashboard - Orders and Payment Confirmation
+receiver_dashboard = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Receiver Dashboard - PayConnect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #f3f4f6;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .order-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+        
+        .order-card.pending {
+            border-left-color: #f59e0b;
+        }
+        
+        .order-card.completed {
+            border-left-color: #10b981;
+        }
+        
+        .order-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        .status-completed {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-around;
+            z-index: 50;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #9ca3af;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .nav-item.active {
+            color: #11998e;
+        }
+        
+        .nav-item i {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        
+        .btn-confirm {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        
+        .btn-confirm:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlide 0.3s ease-out;
+        }
+        
+        @keyframes modalSlide {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .notification-dot {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header-gradient text-white p-6 pb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <p class="text-white/80 text-sm">Welcome back,</p>
+                <h1 class="text-xl font-bold" id="userName">Receiver</h1>
+            </div>
+            <div class="relative">
+                <button onclick="showNotifications()" class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <span class="notification-dot" id="notifDot"></span>
+            </div>
+        </div>
+        
+        <!-- Balance Card -->
+        <div class="bg-white/20 backdrop-blur rounded-2xl p-4">
+            <p class="text-white/80 text-sm mb-1">Total Earnings</p>
+            <div class="flex items-baseline space-x-1">
+                <span class="text-3xl font-bold">₹</span>
+                <span class="text-3xl font-bold" id="totalEarnings">0</span>
+            </div>
+            <p class="text-white/60 text-xs mt-1">Available for withdrawal</p>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="px-4 -mt-4">
+        <!-- Stats Row -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+            <div class="card p-3 text-center">
+                <p class="text-2xl font-bold text-gray-800" id="pendingCount">0</p>
+                <p class="text-xs text-gray-500">Pending</p>
+            </div>
+            <div class="card p-3 text-center">
+                <p class="text-2xl font-bold text-green-600" id="completedCount">0</p>
+                <p class="text-xs text-gray-500">Completed</p>
+            </div>
+            <div class="card p-3 text-center">
+                <p class="text-2xl font-bold text-blue-600" id="todayCount">0</p>
+                <p class="text-xs text-gray-500">Today</p>
+            </div>
+        </div>
+        
+        <!-- UPI Info Card -->
+        <div class="card p-4 mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-qrcode text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Linked UPI</p>
+                        <p class="font-semibold text-gray-800" id="upiDisplay">-</p>
+                    </div>
+                </div>
+                <button onclick="copyUpi()" class="text-green-600 p-2 hover:bg-green-50 rounded-lg">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Orders Section -->
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold text-gray-800">Payment Orders</h2>
+            <button onclick="refreshOrders()" class="text-green-600 text-sm flex items-center space-x-1">
+                <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+        
+        <!-- Orders List -->
+        <div id="ordersList" class="space-y-3">
+            <!-- Orders will be loaded here -->
+        </div>
+        
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-inbox text-3xl text-gray-400"></i>
+            </div>
+            <p class="text-gray-500">No orders yet</p>
+            <p class="text-sm text-gray-400 mt-1">Orders will appear here</p>
+        </div>
+    </div>
+    
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('home')">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('history')">
+            <i class="fas fa-history"></i>
+            <span>History</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('profile')">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </div>
+    </div>
+    
+    <!-- Confirm Payment Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">Confirm Payment Received</h3>
+                <p class="text-sm text-gray-500 mt-1">Order #<span id="modalOrderId"></span></p>
+            </div>
+            
+            <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                <div class="flex justify-between mb-2">
+                    <span class="text-gray-600">Amount</span>
+                    <span class="font-bold text-gray-800">₹<span id="modalAmount">0</span></span>
+                </div>
+                <div class="flex justify-between mb-2">
+                    <span class="text-gray-600">From</span>
+                    <span class="font-medium text-gray-800" id="modalFrom">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Time</span>
+                    <span class="text-gray-800" id="modalTime">-</span>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot</label>
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-green-500 transition-all" onclick="document.getElementById('paymentProof').click()">
+                    <input type="file" id="paymentProof" accept="image/*" class="hidden" onchange="previewPaymentProof(this)">
+                    <div id="proofPlaceholder">
+                        <i class="fas fa-camera text-2xl text-gray-400 mb-2"></i>
+                        <p class="text-sm text-gray-500">Tap to upload proof</p>
+                    </div>
+                    <img id="proofPreview" class="hidden max-h-32 mx-auto rounded-lg">
+                </div>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="closeModal()" class="flex-1 py-3 rounded-xl border-2 border-gray-300 text-gray-600 font-semibold">
+                    Cancel
+                </button>
+                <button onclick="confirmPayment()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentUser = null;
+        let orders = [];
+        let currentOrderId = null;
+        
+        // Load user data
+        function loadUserData() {
+            const role = localStorage.getItem('userRole');
+            const data = localStorage.getItem('userData');
+            
+            if (role !== 'receiver' || !data) {
+                window.location.href = 'receiver.html';
+                return;
+            }
+            
+            currentUser = JSON.parse(data);
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('upiDisplay').textContent = currentUser.upiId;
+            
+            loadOrders();
+        }
+        
+        // Load orders from localStorage (simulated)
+        function loadOrders() {
+            // Get orders from localStorage (in real app, this would be from API)
+            const allOrders = JSON.parse(localStorage.getItem('allOrders') || '[]');
+            orders = allOrders.filter(o => o.receiverId === currentUser.id);
+            
+            // Also get pending orders assigned to this receiver
+            const pendingAssignments = JSON.parse(localStorage.getItem('pendingAssignments') || '[]');
+            pendingAssignments.forEach(assignment => {
+                if (assignment.receiverId === currentUser.id && !orders.find(o => o.id === assignment.orderId)) {
+                    orders.push({
+                        id: assignment.orderId,
+                        amount: assignment.amount,
+                        payerName: assignment.payerName,
+                        status: 'pending',
+                        createdAt: assignment.createdAt,
+                        receiverId: currentUser.id
+                    });
+                }
+            });
+            
+            renderOrders();
+            updateStats();
+        }
+        
+        function renderOrders() {
+            const container = document.getElementById('ordersList');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            // Sort by date, newest first
+            orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            container.innerHTML = orders.map(order => `
+                <div class="card order-card ${order.status} p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-xs text-gray-500">Order #${order.id}</p>
+                            <p class="font-bold text-lg text-gray-800">₹${order.amount}</p>
+                        </div>
+                        <span class="status-badge ${order.status === 'pending' ? 'status-pending' : 'status-completed'}">
+                            ${order.status === 'pending' ? 'Pending' : 'Completed'}
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-gray-500 text-xs"></i>
+                            </div>
+                            <span class="text-sm text-gray-600">${order.payerName || 'User'}</span>
+                        </div>
+                        <span class="text-xs text-gray-400">${formatTime(order.createdAt)}</span>
+                    </div>
+                    
+                    ${order.status === 'pending' ? `
+                        <div class="mt-3 pt-3 border-t border-gray-100">
+                            <button onclick="openConfirmModal('${order.id}')" class="btn-confirm w-full">
+                                <i class="fas fa-check mr-2"></i> I Received Payment
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function updateStats() {
+            const pending = orders.filter(o => o.status === 'pending').length;
+            const completed = orders.filter(o => o.status === 'completed').length;
+            const today = orders.filter(o => {
+                const orderDate = new Date(o.createdAt).toDateString();
+                const todayDate = new Date().toDateString();
+                return orderDate === todayDate;
+            }).length;
+            
+            const earnings = orders
+                .filter(o => o.status === 'completed')
+                .reduce((sum, o) => sum + parseFloat(o.amount), 0);
+            
+            document.getElementById('pendingCount').textContent = pending;
+            document.getElementById('completedCount').textContent = completed;
+            document.getElementById('todayCount').textContent = today;
+            document.getElementById('totalEarnings').textContent = earnings.toFixed(2);
+            
+            // Show notification dot if pending orders exist
+            document.getElementById('notifDot').style.display = pending > 0 ? 'block' : 'none';
+        }
+        
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = (now - date) / 1000; // seconds
+            
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return date.toLocaleDateString();
+        }
+        
+        function openConfirmModal(orderId) {
+            currentOrderId = orderId;
+            const order = orders.find(o => o.id === orderId);
+            
+            if (!order) return;
+            
+            document.getElementById('modalOrderId').textContent = orderId;
+            document.getElementById('modalAmount').textContent = order.amount;
+            document.getElementById('modalFrom').textContent = order.payerName || 'User';
+            document.getElementById('modalTime').textContent = new Date(order.createdAt).toLocaleString();
+            
+            document.getElementById('confirmModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+            document.getElementById('paymentProof').value = '';
+            document.getElementById('proofPreview').classList.add('hidden');
+            document.getElementById('proofPlaceholder').classList.remove('hidden');
+            currentOrderId = null;
+        }
+        
+        function previewPaymentProof(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('proofPreview').src = e.target.result;
+                    document.getElementById('proofPreview').classList.remove('hidden');
+                    document.getElementById('proofPlaceholder').classList.add('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        function confirmPayment() {
+            const proofFile = document.getElementById('paymentProof').files[0];
+            
+            if (!proofFile) {
+                alert('Please upload payment proof screenshot');
+                return;
+            }
+            
+            // Update order status
+            const orderIndex = orders.findIndex(o => o.id === currentOrderId);
+            if (orderIndex !== -1) {
+                orders[orderIndex].status = 'completed';
+                orders[orderIndex].completedAt = new Date().toISOString();
+                orders[orderIndex].proofImage = document.getElementById('proofPreview').src;
+                
+                // Save to localStorage
+                localStorage.setItem('allOrders', JSON.stringify(orders));
+                
+                // Notify payer (in real app, this would be via API/WebSocket)
+                notifyPayer(orders[orderIndex]);
+                
+                alert('Payment confirmed successfully!');
+                closeModal();
+                renderOrders();
+                updateStats();
+            }
+        }
+        
+        function notifyPayer(order) {
+            // In real implementation, this would send push notification or update database
+            const payerNotifications = JSON.parse(localStorage.getItem('payerNotifications') || '[]');
+            payerNotifications.push({
+                userId: order.payerId,
+                type: 'payment_confirmed',
+                orderId: order.id,
+                message: `Your payment of ₹${order.amount} has been confirmed`,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('payerNotifications', JSON.stringify(payerNotifications));
+        }
+        
+        function copyUpi() {
+            navigator.clipboard.writeText(currentUser.upiId).then(() => {
+                alert('UPI ID copied to clipboard!');
+            });
+        }
+        
+        function refreshOrders() {
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('fa-spin');
+            
+            setTimeout(() => {
+                loadOrders();
+                icon.classList.remove('fa-spin');
+            }, 1000);
+        }
+        
+        function switchTab(tab) {
+            if (tab === 'home') {
+                // Already on home
+                return;
+            } else if (tab === 'history') {
+                alert('History page coming soon!');
+            } else if (tab === 'profile') {
+                showProfile();
+            }
+        }
+        
+        function showProfile() {
+            const profileHtml = `
+                <div style="padding: 20px;">
+                    <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">Profile</h3>
+                    <div style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                        <p style="color: #6b7280; font-size: 0.875rem;">Name</p>
+                        <p style="font-weight: 600;">${currentUser.name}</p>
+                    </div>
+                    <div style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                        <p style="color: #6b7280; font-size: 0.875rem;">Phone</p>
+                        <p style="font-weight: 600;">${currentUser.phone}</p>
+                    </div>
+                    <div style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                        <p style="color: #6b7280; font-size: 0.875rem;">UPI ID</p>
+                        <p style="font-weight: 600;">${currentUser.upiId}</p>
+                    </div>
+                    <button onclick="logout()" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-radius: 12px; font-weight: 600; margin-top: 20px;">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                    <button onclick="this.parentElement.remove()" style="width: 100%; padding: 12px; background: #e5e7eb; color: #374151; border-radius: 12px; font-weight: 600; margin-top: 10px;">
+                        Close
+                    </button>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: flex-end;';
+            modal.innerHTML = `<div style="background: #f3f4f6; width: 100%; max-height: 80vh; overflow-y: auto; border-radius: 24px 24px 0 0;">${profileHtml}</div>`;
+            document.body.appendChild(modal);
+        }
+        
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('userRole');
+                localStorage.removeItem('userData');
+                window.location.href = '../index.html';
+            }
+        }
+        
+        function showNotifications() {
+            const pending = orders.filter(o => o.status === 'pending');
+            if (pending.length === 0) {
+                alert('No new notifications');
+                return;
+            }
+            alert(`You have ${pending.length} pending orders to confirm`);
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadUserData);
+        
+        // Listen for new orders (simulated real-time)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'pendingAssignments') {
+                loadOrders();
+            }
+        });
+    </script>
+</body>
+</html>'''
+
+with open(f"{base_path}/pages/receiver-dashboard.html", "w") as f:
+    f.write(receiver_dashboard)
+
+print("✅ receiver-dashboard.html created - Orders management & confirmation")
