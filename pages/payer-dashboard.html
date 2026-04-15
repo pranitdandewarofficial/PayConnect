@@ -1,0 +1,679 @@
+
+# Create Payer Dashboard - Send Money Flow
+payer_dashboard = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Send Money - PayConnect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #f3f4f6;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .amount-btn {
+            transition: all 0.2s;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .amount-btn:hover {
+            border-color: #667eea;
+            background: #f5f3ff;
+        }
+        
+        .amount-btn.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+        
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-around;
+            z-index: 50;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #9ca3af;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .nav-item.active {
+            color: #667eea;
+        }
+        
+        .nav-item i {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlide 0.3s ease-out;
+        }
+        
+        @keyframes modalSlide {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .upi-display {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            border: 2px dashed #9ca3af;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .copy-btn {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .step-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .transaction-card {
+            transition: all 0.3s;
+        }
+        
+        .transaction-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-pending { color: #f59e0b; }
+        .status-completed { color: #10b981; }
+        .status-failed { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header-gradient text-white p-6 pb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <p class="text-white/80 text-sm">Welcome,</p>
+                <h1 class="text-xl font-bold" id="userName">User</h1>
+            </div>
+            <div class="relative">
+                <button onclick="showNotifications()" class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <span class="notification-dot hidden" id="notifDot" style="position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></span>
+            </div>
+        </div>
+        
+        <!-- Balance Card -->
+        <div class="bg-white/20 backdrop-blur rounded-2xl p-4">
+            <p class="text-white/80 text-sm mb-1">Your Balance</p>
+            <div class="flex items-baseline space-x-1">
+                <span class="text-3xl font-bold">₹</span>
+                <span class="text-3xl font-bold" id="userBalance">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="px-4 -mt-4">
+        <!-- Quick Actions -->
+        <div class="card p-4 mb-4">
+            <h3 class="font-semibold text-gray-800 mb-4">Send Money</h3>
+            
+            <!-- Amount Selection -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Amount</label>
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <button onclick="selectAmount(100)" class="amount-btn py-3 rounded-xl font-semibold text-gray-700" data-amount="100">₹100</button>
+                    <button onclick="selectAmount(500)" class="amount-btn py-3 rounded-xl font-semibold text-gray-700" data-amount="500">₹500</button>
+                    <button onclick="selectAmount(1000)" class="amount-btn py-3 rounded-xl font-semibold text-gray-700" data-amount="1000">₹1000</button>
+                </div>
+                <div class="relative">
+                    <span class="absolute left-4 top-3.5 text-gray-500 font-semibold">₹</span>
+                    <input type="number" id="customAmount" placeholder="Enter custom amount" 
+                        class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-purple-500"
+                        oninput="clearSelection()">
+                </div>
+            </div>
+            
+            <!-- Receiver UPI -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Receiver's UPI ID (Optional)</label>
+                <input type="text" id="receiverUpi" placeholder="name@upi (or we'll assign one)" 
+                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-purple-500">
+            </div>
+            
+            <!-- Note -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>
+                <input type="text" id="paymentNote" placeholder="What's this for?" 
+                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-purple-500">
+            </div>
+            
+            <button onclick="initiatePayment()" class="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all">
+                <i class="fas fa-paper-plane mr-2"></i> Proceed to Pay
+            </button>
+        </div>
+        
+        <!-- Recent Transactions -->
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold text-gray-800">Recent Transactions</h2>
+            <button onclick="refreshTransactions()" class="text-purple-600 text-sm">
+                <i class="fas fa-sync-alt" id="refreshTransIcon"></i>
+            </button>
+        </div>
+        
+        <div id="transactionsList" class="space-y-3">
+            <!-- Transactions loaded here -->
+        </div>
+        
+        <div id="emptyTrans" class="hidden text-center py-8">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="fas fa-receipt text-2xl text-gray-400"></i>
+            </div>
+            <p class="text-gray-500 text-sm">No transactions yet</p>
+        </div>
+    </div>
+    
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('home')">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('activity')">
+            <i class="fas fa-list"></i>
+            <span>Activity</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('profile')">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </div>
+    </div>
+    
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="text-center mb-4">
+                <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-mobile-alt text-2xl text-purple-600"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">Complete Payment</h3>
+                <p class="text-sm text-gray-500">Follow the steps below</p>
+            </div>
+            
+            <!-- Step 1: UPI ID -->
+            <div class="mb-4">
+                <div class="flex items-center space-x-3 mb-3">
+                    <div class="step-badge">1</div>
+                    <span class="font-medium text-gray-800">Copy UPI ID</span>
+                </div>
+                <div class="upi-display">
+                    <p class="text-sm text-gray-500 mb-1">Pay to this UPI ID</p>
+                    <p class="text-xl font-bold text-gray-800 mb-3" id="assignedUpi">Loading...</p>
+                    <button onclick="copyUpi()" class="copy-btn">
+                        <i class="fas fa-copy mr-2"></i> Copy UPI ID
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Step 2: Open UPI App -->
+            <div class="mb-4">
+                <div class="flex items-center space-x-3 mb-3">
+                    <div class="step-badge">2</div>
+                    <span class="font-medium text-gray-800">Open UPI App & Pay</span>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <p class="text-sm text-gray-600 mb-3">Open Google Pay, PhonePe, or any UPI app and send <strong>₹<span id="modalAmount">0</span></strong> to the UPI ID above.</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="openUpiApp('gpay')" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-500 transition-all">
+                            <i class="fab fa-google-pay text-2xl text-blue-600"></i>
+                        </button>
+                        <button onclick="openUpiApp('phonepe')" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-purple-500 transition-all">
+                            <i class="fas fa-mobile-alt text-2xl text-purple-600"></i>
+                        </button>
+                        <button onclick="openUpiApp('paytm')" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-cyan-500 transition-all">
+                            <i class="fas fa-wallet text-2xl text-cyan-600"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 3: Upload Proof -->
+            <div class="mb-4">
+                <div class="flex items-center space-x-3 mb-3">
+                    <div class="step-badge">3</div>
+                    <span class="font-medium text-gray-800">Upload Screenshot</span>
+                </div>
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-purple-500 transition-all" onclick="document.getElementById('paymentScreenshot').click()">
+                    <input type="file" id="paymentScreenshot" accept="image/*" class="hidden" onchange="previewScreenshot(this)">
+                    <div id="screenshotPlaceholder">
+                        <i class="fas fa-camera text-2xl text-gray-400 mb-2"></i>
+                        <p class="text-sm text-gray-500">Tap to upload payment screenshot</p>
+                    </div>
+                    <img id="screenshotPreview" class="hidden max-h-32 mx-auto rounded-lg">
+                </div>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="closePaymentModal()" class="flex-1 py-3 rounded-xl border-2 border-gray-300 text-gray-600 font-semibold">
+                    Cancel
+                </button>
+                <button onclick="submitPayment()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold">
+                    I've Paid
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentUser = null;
+        let selectedAmount = 0;
+        let currentOrderId = null;
+        let assignedReceiver = null;
+        
+        // Load user data
+        function loadUserData() {
+            const role = localStorage.getItem('userRole');
+            const data = localStorage.getItem('userData');
+            
+            if (role !== 'payer' || !data) {
+                window.location.href = 'payer.html';
+                return;
+            }
+            
+            currentUser = JSON.parse(data);
+            document.getElementById('userName').textContent = currentUser.name;
+            updateBalance();
+            loadTransactions();
+            checkNotifications();
+        }
+        
+        function updateBalance() {
+            const transactions = currentUser.transactions || [];
+            const balance = transactions
+                .filter(t => t.status === 'completed' && t.type === 'received')
+                .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+            document.getElementById('userBalance').textContent = balance.toFixed(2);
+        }
+        
+        function selectAmount(amount) {
+            selectedAmount = amount;
+            document.getElementById('customAmount').value = amount;
+            
+            // Update UI
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (parseInt(btn.dataset.amount) === amount) {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+        
+        function clearSelection() {
+            selectedAmount = parseInt(document.getElementById('customAmount').value) || 0;
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+        }
+        
+        function initiatePayment() {
+            const amount = parseInt(document.getElementById('customAmount').value) || selectedAmount;
+            const receiverUpi = document.getElementById('receiverUpi').value.trim();
+            const note = document.getElementById('paymentNote').value;
+            
+            if (!amount || amount < 10) {
+                alert('Please enter a valid amount (minimum ₹10)');
+                return;
+            }
+            
+            // Create order
+            currentOrderId = 'ORD' + Date.now();
+            
+            // If receiver UPI provided, use it; otherwise find available receiver
+            if (receiverUpi) {
+                assignedReceiver = {
+                    upiId: receiverUpi,
+                    name: 'Custom Receiver'
+                };
+            } else {
+                // Find an available receiver from localStorage
+                assignedReceiver = findAvailableReceiver();
+                if (!assignedReceiver) {
+                    alert('No receivers available at the moment. Please try again later or enter a specific UPI ID.');
+                    return;
+                }
+            }
+            
+            // Show payment modal
+            document.getElementById('modalAmount').textContent = amount;
+            document.getElementById('assignedUpi').textContent = assignedReceiver.upiId;
+            document.getElementById('paymentModal').classList.add('active');
+            
+            // Store pending assignment
+            const assignment = {
+                orderId: currentOrderId,
+                receiverId: assignedReceiver.id || 'CUSTOM',
+                receiverUpi: assignedReceiver.upiId,
+                payerId: currentUser.id,
+                payerName: currentUser.name,
+                amount: amount,
+                note: note,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            };
+            
+            const assignments = JSON.parse(localStorage.getItem('pendingAssignments') || '[]');
+            assignments.push(assignment);
+            localStorage.setItem('pendingAssignments', JSON.stringify(assignments));
+        }
+        
+        function findAvailableReceiver() {
+            // In real app, this would fetch from server
+            // For demo, check if there's a receiver registered
+            const receiverRole = localStorage.getItem('userRole');
+            const receiverData = localStorage.getItem('userData');
+            
+            if (receiverRole === 'receiver' && receiverData) {
+                const receiver = JSON.parse(receiverData);
+                return {
+                    id: receiver.id,
+                    upiId: receiver.upiId,
+                    name: receiver.name
+                };
+            }
+            
+            return null;
+        }
+        
+        function copyUpi() {
+            const upi = document.getElementById('assignedUpi').textContent;
+            navigator.clipboard.writeText(upi).then(() => {
+                alert('UPI ID copied! Open your UPI app and paste it.');
+            });
+        }
+        
+        function openUpiApp(app) {
+            // In real app, this would open the specific UPI app
+            alert('Please manually open your UPI app and pay to: ' + document.getElementById('assignedUpi').textContent);
+        }
+        
+        function previewScreenshot(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('screenshotPreview').src = e.target.result;
+                    document.getElementById('screenshotPreview').classList.remove('hidden');
+                    document.getElementById('screenshotPlaceholder').classList.add('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        function submitPayment() {
+            const screenshot = document.getElementById('paymentScreenshot').files[0];
+            
+            if (!screenshot) {
+                alert('Please upload payment screenshot as proof');
+                return;
+            }
+            
+            // Save transaction
+            const transaction = {
+                id: currentOrderId,
+                type: 'sent',
+                amount: document.getElementById('modalAmount').textContent,
+                receiverUpi: assignedReceiver.upiId,
+                receiverName: assignedReceiver.name,
+                status: 'pending',
+                screenshot: document.getElementById('screenshotPreview').src,
+                createdAt: new Date().toISOString()
+            };
+            
+            currentUser.transactions = currentUser.transactions || [];
+            currentUser.transactions.push(transaction);
+            localStorage.setItem('userData', JSON.stringify(currentUser));
+            
+            // Update assignment with screenshot
+            const assignments = JSON.parse(localStorage.getItem('pendingAssignments') || '[]');
+            const assignment = assignments.find(a => a.orderId === currentOrderId);
+            if (assignment) {
+                assignment.payerScreenshot = document.getElementById('screenshotPreview').src;
+                localStorage.setItem('pendingAssignments', JSON.stringify(assignments));
+            }
+            
+            alert('Payment submitted! Waiting for receiver confirmation.');
+            closePaymentModal();
+            loadTransactions();
+            
+            // Clear form
+            document.getElementById('customAmount').value = '';
+            document.getElementById('receiverUpi').value = '';
+            document.getElementById('paymentNote').value = '';
+            selectedAmount = 0;
+            document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
+        }
+        
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.remove('active');
+            document.getElementById('paymentScreenshot').value = '';
+            document.getElementById('screenshotPreview').classList.add('hidden');
+            document.getElementById('screenshotPlaceholder').classList.remove('hidden');
+        }
+        
+        function loadTransactions() {
+            const transactions = currentUser.transactions || [];
+            const container = document.getElementById('transactionsList');
+            const emptyState = document.getElementById('emptyTrans');
+            
+            if (transactions.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            // Sort by date, newest first
+            transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            container.innerHTML = transactions.slice(0, 5).map(t => `
+                <div class="card transaction-card p-4">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 ${t.type === 'sent' ? 'bg-red-100' : 'bg-green-100'} rounded-full flex items-center justify-center">
+                                <i class="fas ${t.type === 'sent' ? 'fa-arrow-up text-red-600' : 'fa-arrow-down text-green-600'}"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-800">${t.type === 'sent' ? 'Sent' : 'Received'}</p>
+                                <p class="text-xs text-gray-500">${t.receiverUpi || 'Unknown'}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold ${t.type === 'sent' ? 'text-red-600' : 'text-green-600'}">
+                                ${t.type === 'sent' ? '-' : '+'}₹${t.amount}
+                            </p>
+                            <p class="text-xs status-${t.status}">${t.status.charAt(0).toUpperCase() + t.status.slice(1)}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function refreshTransactions() {
+            const icon = document.getElementById('refreshTransIcon');
+            icon.classList.add('fa-spin');
+            
+            setTimeout(() => {
+                loadTransactions();
+                checkNotifications();
+                icon.classList.remove('fa-spin');
+            }, 1000);
+        }
+        
+        function checkNotifications() {
+            // Check for confirmed payments
+            const notifications = JSON.parse(localStorage.getItem('payerNotifications') || '[]');
+            const userNotifications = notifications.filter(n => n.userId === currentUser.id && !n.read);
+            
+            if (userNotifications.length > 0) {
+                document.getElementById('notifDot').classList.remove('hidden');
+                
+                // Show notification alert
+                userNotifications.forEach(n => {
+                    setTimeout(() => {
+                        alert(n.message);
+                    }, 500);
+                    n.read = true;
+                });
+                
+                localStorage.setItem('payerNotifications', JSON.stringify(notifications));
+                
+                // Update balance
+                updateBalance();
+            }
+        }
+        
+        function showNotifications() {
+            checkNotifications();
+        }
+        
+        function switchTab(tab) {
+            if (tab === 'home') return;
+            if (tab === 'activity') {
+                // Show all transactions
+                alert('Activity page: You have ' + (currentUser.transactions?.length || 0) + ' total transactions');
+            }
+            if (tab === 'profile') {
+                showProfile();
+            }
+        }
+        
+        function showProfile() {
+            const profileHtml = `
+                <div style="padding: 20px;">
+                    <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">Profile</h3>
+                    <div style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                        <p style="color: #6b7280; font-size: 0.875rem;">Name</p>
+                        <p style="font-weight: 600;">${currentUser.name}</p>
+                    </div>
+                    <div style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                        <p style="color: #6b7280; font-size: 0.875rem;">Phone</p>
+                        <p style="font-weight: 600;">${currentUser.phone}</p>
+                    </div>
+                    <div style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                        <p style="color: #6b7280; font-size: 0.875rem;">Email</p>
+                        <p style="font-weight: 600;">${currentUser.email}</p>
+                    </div>
+                    <button onclick="logout()" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-radius: 12px; font-weight: 600; margin-top: 20px;">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                    <button onclick="this.parentElement.remove()" style="width: 100%; padding: 12px; background: #e5e7eb; color: #374151; border-radius: 12px; font-weight: 600; margin-top: 10px;">
+                        Close
+                    </button>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: flex-end;';
+            modal.innerHTML = `<div style="background: #f3f4f6; width: 100%; max-height: 80vh; overflow-y: auto; border-radius: 24px 24px 0 0;">${profileHtml}</div>`;
+            document.body.appendChild(modal);
+        }
+        
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('userRole');
+                localStorage.removeItem('userData');
+                window.location.href = '../index.html';
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadUserData);
+        
+        // Listen for storage changes (real-time updates)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'payerNotifications') {
+                checkNotifications();
+            }
+        });
+    </script>
+</body>
+</html>'''
+
+with open(f"{base_path}/pages/payer-dashboard.html", "w") as f:
+    f.write(payer_dashboard)
+
+print("✅ payer-dashboard.html created - Payment flow with UPI assignment")
